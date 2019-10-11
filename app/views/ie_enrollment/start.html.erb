@@ -1,0 +1,149 @@
+<% # TODO: before proceeding, validate that we are actually in IE. %>
+
+<%= form_tag({:controller => "ie_enrollment", :action => "enroll"}, {:name => "CertReqForm"}) do %>
+
+  <input name="pkcs10" type="hidden" value=""/>
+  <label for="CspProvider">Provider:
+    <select name="CspProvider" id="CspProvider"></select>
+  </label>
+  <input type="button" value="Install" name="GenReq" >
+
+<%- end %>
+
+<p>
+  Notes:
+</p>
+<ul>
+  <li>Tested only with IE11 on Windows 10.</li>
+  <li>The root CA for the certificate to be installed should be previously installed in the "Trusted Root Certification Authorities" store for the current user.</li>
+  <li>It has been observed that the user requires to register the current website as a Trusted site.</li>
+</ul>
+
+<%= render "ie_enrollment/setup" %>
+<% # Note that the VBScript code in this project has been based in the enrollment code from EJBCA. %>
+<script type="text/vbscript">
+<!--
+
+' TODO try to use some type of array instead of a Dictionary.
+Set whitelistedCsps = CreateObject ("Scripting.Dictionary")
+whitelistedCsps.item("EnterSafe ePass2003 CSP v1.0") = ""
+
+' Set to True for getting the list of all available CSPs.
+displayAllCsps = True
+
+Dim g_objEnroll, g_objPrivateKey, g_objRequest, g_objRequestCMC, g_objCSPInformations, g_certEnrollLoadError
+
+Function InitVistaCSP()
+  On Error resume next
+  Set g_objEnroll				= g_objClassFactory.CreateObject("X509Enrollment.CX509Enrollment")
+  Set g_objPrivateKey			= g_objClassFactory.CreateObject("X509Enrollment.CX509PrivateKey")
+  Set g_objRequest			= g_objClassFactory.CreateObject("X509Enrollment.CX509CertificateRequestPkcs10")
+  Set g_objCSPInformations	= g_objClassFactory.CreateObject("X509Enrollment.CCspInformations")
+  If 0<>Err.Number Then
+    g_certEnrollLoadError = Err.Number
+  Else
+    g_certEnrollLoadError = 0
+    g_objCSPInformations.AddAvailableCsps
+  End If
+  On Error Goto 0
+End Function
+
+Function GetCertEnrollCSPList()
+  On Error Resume Next
+  Dim nDefaultCSP, nCSPIndex, CspInformations, CspInformation, oOption
+
+  Set CspInformations = g_objCSPInformations
+
+  ' Loop through all CspInformation objects
+  For nCSPIndex = 0 To CspInformations.Count-1
+    Set CspInformation = CspInformations.ItemByIndex(nCSPIndex)
+      If whitelistedCsps.exists(CspInformation.Name) = True Or displayAllCsps then
+        If True = CspInformation.LegacyCsp Then	'Make sure that it's a Next Generation (CNG) provider
+          Set oOption = document.createElement("Option")
+          oOption.text = CspInformation.Name
+          oOption.Value = CspInformation.Type
+          document.CertReqForm.CspProvider.add(oOption)
+        End If
+      End If
+  Next
+
+  If document.CertReqForm.CspProvider.childElementCount = 0 Then
+    Set oOption = document.createElement("Option")
+    oOption.text = "No whitelisted CSP available"
+    document.CertReqForm.CspProvider.add(oOption)
+  End If
+
+  Document.CertReqForm.CspProvider.selectedIndex = 0
+End Function	'GetCertEnrollCSPList
+
+Function GetCSR()
+  GetCSR = ""
+  ' Get provider name and type
+  Dim ProviderName, ProviderType
+  ProviderName = document.all.CspProvider.options(document.all.CspProvider.options.selectedIndex).text
+  ProviderType = document.all.CspProvider.options(document.all.CspProvider.options.selectedIndex).value
+  g_objPrivateKey.ProviderName = ProviderName
+  g_objPrivateKey.ProviderType = ProviderType
+  g_objPrivateKey.Length = 2048
+  If ProviderType < 2 Then
+    g_objPrivateKey.KeySpec = 1	'AT_KEYEXCHANGE
+  Else
+    g_objPrivateKey.KeySpec = 2	'AT_SIGNATURE
+  End If
+  g_objPrivateKey.MachineContext = false
+  g_objPrivateKey.KeyProtection = 1	' (XCN_NCRYPT_UI_PROTECT_KEY_FLAG = 1)
+  g_objPrivateKey.ExportPolicy = 0	' (XCN_NCRYPT_ALLOW_EXPORT_FLAG = 1)
+  g_objPrivateKey.Existing = False
+  ' Initialize
+  Call g_objRequest.InitializeFromPrivateKey(1, g_objPrivateKey, "")	'X509CertificateEnrollmentContext.ContextUser
+  Dim X500DistinguishedName
+  Set X500DistinguishedName = g_objClassFactory.CreateObject("X509Enrollment.CX500DistinguishedName")
+  Call X500DistinguishedName.Encode("CN=6AEK347fw8vWE424", 0)	'XCN_CERT_NAME_STR_NONE
+  g_objRequest.Subject = X500DistinguishedName
+  ' Set hash algo
+  Dim CspInformation, CspAlgorithms, CspAlgorithm, nBestIndex, nAlgIndex
+  Set CspInformation = g_objCSPInformations.ItemByName(ProviderName)
+  Set CspAlgorithms = CspInformation.CspAlgorithms
+  nBestIndex = 0
+  For nAlgIndex=0 To CspAlgorithms.Count-1
+    If CspAlgorithms.ItemByIndex(nAlgIndex).Name = "sha1" Then
+      nBestIndex = nAlgIndex
+    End If
+    If CspAlgorithms.ItemByIndex(nAlgIndex).Name = "md5" AND CspAlgorithms.ItemByIndex(nBestIndex).Name <> "sha1" Then
+      nBestIndex = nAlgIndex
+    End If
+  Next
+  Set CspAlgorithm = CspAlgorithms.ItemByIndex(nBestIndex)
+  If CspAlgorithm.Type = 2 Then	'XCN_CRYPT_HASH_INTERFACE
+    g_objRequest.HashAlgorithm = CspAlgorithm.GetAlgorithmOid(0, 0)	', AlgorithmFlagsNone
+  End if
+  ' Try to create request
+  g_objEnroll.InitializeFromRequest(g_objRequest)
+  GetCSR = g_objEnroll.CreateRequest(3)	'CRYPT_STRING_BASE64REQUESTHEADER
+  if len(GetCSR)<>0 then Exit Function
+End Function	'GetCSR
+
+' Used by both post and pre Vista code
+Sub GenReq_OnClick
+  Dim TheForm, result
+  Set TheForm = Document.CertReqForm
+  err.clear
+  If g_certEnrollLoadError <> 0 Then
+    Call MsgBox("Could not load CertEnroll.", 0, "Alert")
+    Exit Sub
+  End if
+  result = GetCSR()
+  if len(result)=0 Then
+    result = MsgBox("Unable to generate PKCS#10 certificate request.", 0, "Alert")
+    Exit Sub
+  End If
+  TheForm.pkcs10.Value = result
+  TheForm.Submit
+  Exit Sub
+End Sub	'GenReq_OnClick
+
+InitVistaCSP()
+GetCertEnrollCSPList()
+-->
+</script>
+

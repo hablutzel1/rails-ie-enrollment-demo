@@ -1,0 +1,22 @@
+Installation result: <span id="installation_result"></span>
+
+<%= render "ie_enrollment/setup" %>
+<script language="VBScript" type="text/vbscript">
+    <!--
+  <%= @cert_chain_as_vbs_string.html_safe %>
+  Dim objEnroll
+  Set objEnroll = g_objClassFactory.CreateObject("X509Enrollment.CX509Enrollment")
+  Call objEnroll.Initialize(1)	'EnrollmentContext UserContext
+  err.clear
+  On Error Resume Next
+  Call objEnroll.InstallResponse(0, cert, 6, "")	'AllowNone, , XCN_CRYPT_STRING_BASE64_ANY, pw
+  If err.number = -2146762487 Then	' 0x800b0109 Not trusted root
+    installation_result.InnerHTML = "Could not complete the request since, the CAs' certificates were not properly installed."
+  ElseIf err.number <> 0 Then
+    installation_result.InnerHTML = "The certificate could not be installed"
+  Else
+    installation_result.InnerHTML = "A new certificate has been installed"
+  End If
+    -->
+</script>
+

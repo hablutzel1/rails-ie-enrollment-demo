@@ -1,0 +1,7 @@
+<% content_for :head do %>
+  <!-- It has been observed that it is required to emulate IE<11 for cert enroll to work. -->
+  <% # TODO confirm if the following is the ideal in this context. %>
+  <meta http-equiv="X-UA-Compatible" content="IE=EmulateIE10" />
+<% end %>
+<% # TODO check: maybe the following is compatible only with certain Windows/IE combinations. Test with other combinations. %>
+<object classid="clsid:884e2049-217d-11da-b2a4-000e7bbb2b09" id="g_objClassFactory"></object>
