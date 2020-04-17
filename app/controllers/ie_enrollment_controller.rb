@@ -27,7 +27,8 @@ class IeEnrollmentController < ApplicationController
 
     # Send PKCS #10 to EJBCA and receive a cert-only PKCS #7 (https://tools.ietf.org/html/rfc2797#section-7.1).
     ejbca_client = Blobfish::Ejbca::Client.new('https://blobfish-25.blobfish.pe:8443/ejbca/ejbcaws/ejbcaws?wsdl', 'config/ejbca/BlobfishRootCAdemo.cacert.pem', 'config/ejbca/app_llamape_ra_ejbca_client.cer', 'config/ejbca/app_llamape_ra_ejbca_client.key', 'secret', 'LlamaPeStandardCa', 'LlamaPePJEndUserNoApproval_CP', 'LlamaPePJEndUserNoNotification_EE')
-    pkcs7 = helpers.request_pkcs7_from_csr(ejbca_client, csr_from_browser, ejbca_username, email_address, subject_dn, subject_alt_name, :days_from_now, 365)
+    # TODO determine if the IE enrollment could work with a RESPONSETYPE_CERTIFICATE (but note that it could work better by having available the chain with the ICAs).
+    pkcs7 = ejbca_client.request_from_csr(csr_from_browser, ejbca_username, email_address, subject_dn, subject_alt_name, :days_from_now, 365, Blobfish::Ejbca::Client::RESPONSETYPE_PKCS7WITHCHAIN)
 
     # Send the resulting cert-only PKCS #7 back to the browser.
     pkcs7_b64 = Base64.encode64(pkcs7.to_der)

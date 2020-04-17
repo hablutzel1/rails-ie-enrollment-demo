@@ -24,7 +24,8 @@ gem 'jbuilder', '~> 2.7'
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', '>= 1.4.2', require: false
 
-gem 'blobfish-ejbca-client-ruby', '0.1.0', :git => 'https://github.com/hablutzel1/blobfish-ejbca-client-ruby.git'
+gem 'blobfish-ejbca-client-ruby', '0.1.1'
+# gem 'blobfish-ejbca-client-ruby', :path => '/path/to/blobfish-ejbca-client-ruby'
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
